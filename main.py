@@ -14,31 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from datautils import load_dataset, build_dataloader
-from models import RNN, LSTM, GRU
-
-
-model_classes = {
-    'rnn': RNN,
-    'lstm': LSTM,
-    'gru': GRU
-}
-
-optimizers = {
-    'adam': torch.optim.Adam,  # default lr=0.001
-    'sgd': torch.optim.SGD,
-}
-
-datasets = {
-    'rt-polarity': {
-        'train': 'data/train.pkl',
-        'test': 'data/test.pkl'
-    }
-}
-
-pretrains = {
-    'random': None,
-    'glove.6B.50d': ''
-}
+import config
 
 
 class Model:
@@ -130,17 +106,12 @@ def main():
     parser.add_argument('--output_size', default=2, type=int)
     parser.add_argument('--max_seq_len', default=30, type=int)
     parser.add_argument('--dataset', default='rt-polarity', type=str)
-    parser.add_argument('--device', default=None, type=str, help='e.g. cuda:0')
     opt = parser.parse_args()
 
-    opt.model = model_classes[opt.model]
-    opt.optimizer = optimizers[opt.optimizer]
-    opt.dataset = datasets[opt.dataset]
-    opt.pretrain = pretrains[opt.embeddings]
+    opt.model = config.model_classes[opt.model]
+    opt.optimizer = config.optimizers[opt.optimizer]
+    opt.pretrain = config.pretrains[opt.embeddings]
     opt.vocab_size = 30000
-
-    opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
-        if opt.device is None else torch.device(opt.device)
 
     model = Model(opt)
 
