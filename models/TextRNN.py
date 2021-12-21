@@ -1,8 +1,3 @@
-from pickle import NONE
-from typing import Tuple
-import numpy as np
-import torch
-from torch.functional import Tensor
 import torch.nn as nn
 
 
@@ -18,8 +13,8 @@ class RNN(nn.Module):
         if opt.pretrain is None:
             self.embedding = nn.Embedding(opt.vocab_size, self.embedding_dim)
         else:
-            pass
-            # self.embedding = nn.Embedding.from_pretrained(embeddings=embeddings, freeze=False)
+            self.embedding = nn.Embedding.from_pretrained(embeddings=opt.pretrain, freeze=False)
+
         self.output = nn.Linear(self.hidden_size, self.output_size)
 
         self.rnn = nn.RNN(
@@ -29,7 +24,7 @@ class RNN(nn.Module):
             batch_first=True
         )
 
-    def forward(self, x: Tensor, hidden: Tensor=None):
+    def forward(self, x, hidden=None):
         if hidden is None:
             hidden = x.data.new(self.num_layers, x.shape[0], self.hidden_size).fill_(0).float()
         x = self.embedding(x)

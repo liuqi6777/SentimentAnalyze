@@ -2,18 +2,13 @@
 # @Author : Liu Qi
 
 import argparse
-import logging
-import os
-
-from matplotlib import pyplot as plt
-import numpy as np
 from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 
-from datautils import load_dataset, build_dataloader
+from datautils import load_dataset, build_dataloader, load_vocab, build_pretrain
 import config
 
 
@@ -24,13 +19,15 @@ class Model:
         self.optimizer = opt.optimizer(self.model.parameters(), lr=self.opt.lr)
         self.criterion = nn.CrossEntropyLoss()
 
-    def train(self, train_data_loader, val_data_loader=None):
+    def train(self, train_data_loader):
         losses = []
         for epoch in tqdm(range(self.opt.epoch)):
             loss_list = []
-            for batch, (input, target) in enumerate(train_data_loader):
+            for batch, (_input, target) in enumerate(train_data_loader):
                 self.optimizer.zero_grad()
-                output, _ = self.model(input)
+                output = self.model(_input)
+                if isinstance(output, tuple):
+                    output, _ = output
                 loss = self.criterion(output, target)
                 loss.backward()
                 self.optimizer.step()
@@ -42,21 +39,28 @@ class Model:
             print("[INFO] average loss of epoch {}: {}".format(epoch+1, epoch_loss))
             losses.append(epoch_loss)
 
+        plt.figure()
+        plt.plot(losses)
+        plt.show()
+
     def evaluate(self, test_data_loader):
         n_total = 0
         outputs_all = torch.tensor([])
         targets_all = torch.tensor([])
         with torch.no_grad():
-            for batch, (input, target) in enumerate(test_data_loader):
-                output, _ = self.model(input)
-                output = torch.argmax(output, dim=-1)
-                n_total += len(output)
+            for batch, (inputs, targets) in enumerate(test_data_loader):
+                outputs = self.model(inputs)
+                if isinstance(outputs, tuple):
+                    outputs, _ = outputs
+                outputs = torch.argmax(outputs, dim=-1)
+                n_total += len(outputs)
 
-                targets_all = torch.cat((targets_all, target), dim=0)
-                outputs_all = torch.cat((outputs_all, output), dim=0)
+                targets_all = torch.cat((targets_all, targets), dim=0)
+                outputs_all = torch.cat((outputs_all, outputs), dim=0)
 
         def cal_accuracy(target, output):
-            return ((output == target).sum() / len(output)).item()
+            if isinstance(target, torch.Tensor) and isinstance(target, torch.Tensor):
+                return ((output == target).sum() / len(output)).item()
 
         def cal_precision(target, output):
             return (((target == 1) & (output == 1)).sum() / (output == 1).sum()).item()
@@ -65,7 +69,7 @@ class Model:
             return (((target == 1) & (output == 1)).sum() / (target == 1).sum()).item()
 
         def cal_f1_score(target, output):
-            return (2 / (1 / cal_precision(target, output) + 1 / cal_recall(target, output)))
+            return 2 / (1 / cal_precision(target, output) + 1 / cal_recall(target, output))
 
         acc = cal_accuracy(targets_all, outputs_all)
         prc = cal_precision(targets_all, outputs_all)
@@ -101,17 +105,19 @@ def main():
     parser.add_argument('--num_layers', default=2, type=int)
     parser.add_argument('--epoch', default=20, type=int)
     parser.add_argument('--batch_size', default=256, type=int)
-    parser.add_argument('--embedding_dim', default=128, type=int)
-    parser.add_argument('--hidden_size', default=256, type=int)
+    parser.add_argument('--embedding_dim', default=50, type=int)
+    parser.add_argument('--hidden_size', default=128, type=int)
     parser.add_argument('--output_size', default=2, type=int)
-    parser.add_argument('--max_seq_len', default=30, type=int)
-    parser.add_argument('--dataset', default='rt-polarity', type=str)
     opt = parser.parse_args()
 
     opt.model = config.model_classes[opt.model]
     opt.optimizer = config.optimizers[opt.optimizer]
-    opt.pretrain = config.pretrains[opt.embeddings]
-    opt.vocab_size = 30000
+
+    vocab = load_vocab('data/vocab.pkl')
+    opt.vocab_size = len(vocab)
+
+    opt.pretrain = None
+    opt.pretrain = build_pretrain(vocab, 'data/glove.6B.50d.txt', 50)
 
     model = Model(opt)
 

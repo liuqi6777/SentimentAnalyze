@@ -1,5 +1,3 @@
-import torch
-from torch._C import parse_schema
 import torch.nn as nn
 
 
@@ -12,7 +10,11 @@ class GRU(nn.Module):
         self.output_size = opt.output_size
         self.num_layers = opt.num_layers
 
-        self.embedding = nn.Embedding(opt.vocab_size, self.embedding_dim)
+        if opt.pretrain is None:
+            self.embedding = nn.Embedding(opt.vocab_size, self.embedding_dim)
+        else:
+            self.embedding = nn.Embedding.from_pretrained(embeddings=opt.pretrain, freeze=False)
+
         self.output = nn.Linear(self.hidden_size, self.output_size)
 
         self.gru = nn.GRU(
